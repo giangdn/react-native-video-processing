@@ -11,67 +11,33 @@ import GPUImage
 @objc(RNVideoPlayer)
 class RNVideoPlayer: RCTView {
     
-  let processingFilters: VideoProcessingGPUFilters = VideoProcessingGPUFilters()
-  
-  var playerVolume: NSNumber = 0
-  var player: AVPlayer! = nil
-  var playerLayer: AVPlayerLayer?
-  
-  var playerCurrentTimeObserver: Any! = nil
-  var playerItem: AVPlayerItem! = nil
-  var gpuMovie: GPUImageMovie! = nil
-  
-  var phantomGpuMovie: GPUImageMovie! = nil
-  var phantomFilterView: GPUImageView = GPUImageView()
-  
-  let filterView: GPUImageView = GPUImageView()
-  
-  var _playerHeight: CGFloat = UIScreen.main.bounds.width * 4 / 3
-  var _playerWidth: CGFloat = UIScreen.main.bounds.width
-  var _moviePathSource: NSString = ""
-  var _playerStartTime: CGFloat = 0
-  var _playerEndTime: CGFloat = 0
-  var _replay: Bool = false
-  var _rotate: Bool = false
-  var isInitialized = false
+    let processingFilters: VideoProcessingGPUFilters = VideoProcessingGPUFilters()
+    
+    var playerVolume: NSNumber = 0
+    var player: AVPlayer! = nil
+    var playerLayer: AVPlayerLayer?
+    
+    var playerCurrentTimeObserver: Any! = nil
+    var playerItem: AVPlayerItem! = nil
+    var gpuMovie: GPUImageMovie! = nil
+    
+    var phantomGpuMovie: GPUImageMovie! = nil
+    var phantomFilterView: GPUImageView = GPUImageView()
+    
+    let filterView: GPUImageView = GPUImageView()
+    
+    var _playerHeight: CGFloat = UIScreen.main.bounds.width * 4 / 3
+    var _playerWidth: CGFloat = UIScreen.main.bounds.width
+    var _moviePathSource: NSString = ""
+    var _playerStartTime: CGFloat = 0
+    var _playerEndTime: CGFloat = 0
+    var _replay: Bool = false
+    var _rotate: Bool = false
+    var isInitialized = false
   var _resizeMode = AVLayerVideoGravity.resizeAspect
-  @objc var onChange: RCTBubblingEventBlock?
-  
-  let LOG_KEY: String = "VIDEO_PROCESSING"
-  
-  @objc func setSource(_ val: NSString) {
-    source = val
-  }
-  @objc func setCurrentTime(_ val: NSNumber) {
-    currentTime = val
-  }
-  @objc func setStartTime(_ val: NSNumber) {
-    startTime = val
-  }
-  @objc func setEndTime(_ val: NSNumber) {
-    endTime = val
-  }
-  @objc func setPlayerWidth(_ val: NSNumber) {
-    playerWidth = val
-  }
-  @objc func setPlayerHeight(_ val: NSNumber) {
-    playerHeight = val
-  }
-  @objc func setPlay(_ val: NSNumber) {
-    play = val
-  }
-  @objc func setReplay(_ val: NSNumber) {
-    replay = val
-  }
-  @objc func setRotate(_ val: NSNumber) {
-    rotate = val
-  }
-  @objc func setVolume(_ val: NSNumber) {
-    volume = val
-  }
-  @objc func setResizeMode(_ val: NSString) {
-    resizeMode = val
-  }
+    var onChange: RCTBubblingEventBlock?
+    
+    let LOG_KEY: String = "VIDEO_PROCESSING"
     
     // props
     var playerHeight: NSNumber? {
@@ -99,10 +65,10 @@ class RNVideoPlayer: RCTView {
     
     var resizeMode: NSString? {
         set {
-            guard let newValue = newValue as String? else {
+            if newValue == nil {
                 return
             }
-            self._resizeMode = AVLayerVideoGravity(rawValue: newValue)
+          self._resizeMode = AVLayerVideoGravity(rawValue: newValue as! String)
             self.playerLayer?.videoGravity = self._resizeMode
             self.setNeedsLayout()
             print("CHANGED: resizeMode \(newValue)")
@@ -152,7 +118,7 @@ class RNVideoPlayer: RCTView {
                 let floatVal = convertedValue >= 0 ? convertedValue : self._playerStartTime
                 print("CHANGED: currentTime \(floatVal)")
                 if floatVal <= self._playerEndTime && floatVal >= self._playerStartTime {
-                    self.player.seek(to: convertToCMTime(val: floatVal), toleranceBefore: .zero, toleranceAfter: .zero)
+                    self.player.seek(to: convertToCMTime(val: floatVal), toleranceBefore: kCMTimeZero, toleranceAfter: kCMTimeZero)
                 }
             }
         }
@@ -271,7 +237,7 @@ class RNVideoPlayer: RCTView {
                     filterView.frame.size.height = self._playerWidth
                     filterView.bounds.size.width = self._playerHeight
                     filterView.bounds.size.height = self._playerWidth
-                    rotationAngle = CGFloat.pi / 2
+                    rotationAngle = CGFloat(M_PI_2)
                 } else {
                     filterView.frame.size.width = self._playerWidth
                     filterView.frame.size.height = self._playerHeight
@@ -326,17 +292,17 @@ class RNVideoPlayer: RCTView {
     }
     
     func toBase64(image: UIImage) -> String {
-        let imageData:NSData = image.pngData()! as NSData
+        let imageData:NSData = UIImagePNGRepresentation(image)! as NSData
         return imageData.base64EncodedString(options: .lineLength64Characters)
     }
     
     func convertToCMTime(val: CGFloat) -> CMTime {
-        return CMTimeMakeWithSeconds(Float64(val), preferredTimescale: Int32(NSEC_PER_SEC))
+        return CMTimeMakeWithSeconds(Float64(val), Int32(NSEC_PER_SEC))
     }
     
     func createPlayerObservers() -> Void {
         // TODO: clean obersable when View going to diesappear
-        let interval = CMTimeMakeWithSeconds(1.0, preferredTimescale: Int32(NSEC_PER_SEC))
+        let interval = CMTimeMakeWithSeconds(1.0, Int32(NSEC_PER_SEC))
         self.playerCurrentTimeObserver = self.player.addPeriodicTimeObserver(
             forInterval: interval,
             queue: nil,
@@ -375,7 +341,7 @@ class RNVideoPlayer: RCTView {
         
         if self.player == nil {
             player = AVPlayer()
-            player.volume = playerVolume.floatValue
+            player.volume = Float(self.playerVolume)
         }
         playerItem = AVPlayerItem(url: movieURL as! URL)
         player.replaceCurrentItem(with: playerItem)
@@ -416,8 +382,8 @@ class RNVideoPlayer: RCTView {
         super.willMove(toSuperview: newSuperview)
         if newSuperview == nil {
             
-            if let observer = self.playerCurrentTimeObserver {
-                self.player.removeTimeObserver(observer)
+            if self.playerCurrentTimeObserver != nil {
+                self.player.removeTimeObserver(self.playerCurrentTimeObserver)
             }
             if player != nil {
                 self.player.pause()
